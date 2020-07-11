@@ -7,4 +7,4 @@ A repository for implementing Google's BERT directly
 
 
 This project is about learning and implementing Google's BERT paper.
-#The copyright belongs to the original author, and I would like to inform you 
+The copyright belongs to the original author, and I would like to inform you 
