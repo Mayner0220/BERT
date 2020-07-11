@@ -10,7 +10,7 @@ This project is about learning and implementing Google's BERT paper.
 The copyright belongs to the original author, and I would like to inform you 
 
 
-- Reference
+Reference
 
 https://arxiv.org/abs/1810.04805
 
