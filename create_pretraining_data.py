@@ -302,4 +302,18 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
 
         if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and token.startswith("##")):
             cand_indexes[-1].append(i)
-            
+        else:
+            cand_indexes.append([i])
+
+    rng.shuffle(cand_indexes)
+
+    ouput_tokens = list(tokens)
+
+    num_to_predict = min(max_predictions_per_seq,
+                         max(1, int(round(len(tokens * masked_lm_prob)))))
+    masked_lms = []
+    covered_indexes = set()
+
+    for index_set in cand_indexes:
+        if len(masked_lms) >= num_to_predict:
+            break
