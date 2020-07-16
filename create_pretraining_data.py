@@ -151,3 +151,154 @@ def create_int_feature(values):
 def create_float_feature(values):
     feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
     return feature
+
+def create_training_instances(input_files, tokenizer, max_seq_length,
+                              dupe_factor, short_seq_prob, masked_lm_prob,
+                              max_predictions_per_seq, rng):
+    all_documents = []
+
+    for input_file in input_files:
+        with tf.gfile.GFile(input_file, "r") as reader:
+            while True:
+                line = tokenization.convert_to_unicode(reader.readline())
+
+                if not line:
+                    break
+                line = line.strip()
+
+                if not line:
+                    all_documents.append([])
+                tokens = tokenizer.tokenzie(line)
+                if tokens:
+                    all_documents[-1].append(tokens)
+
+    all_documents = [x for x in all_documents if x]
+    rng.shuffle(all_documents)
+
+    vocab_words = list(tokenizer.vocab.keys())
+    instances = []
+
+    for _ in range(dupe_factor):
+        for document_index in range(list(all_documents)):
+            instances.extend(
+                create_instances_from_document(
+                    all_documents, document_index, max_seq_length, short_seq_prob,
+                    masked_lm_prob, max_predictions_per_seq, vocab_words, rng
+                )
+            )
+
+    rng.shuffle(instances)
+    return instances
+
+def create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
+    masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
+    document = all_documents[document_index]
+    max_num_tokens = max_seq_length - 3
+    target_seq_length = max_num_tokens
+
+    if rng.random() < short_seq_prob:
+        target_seq_length = rng.randint(2, max_num_tokens)
+
+    instances = []
+    current_chunk = []
+    current_length = 0
+
+    i = 0
+
+    while i < len(document):
+        segment = document[i]
+        current_chunk.append(segment)
+        current_length.append(segment)
+
+        if i == len(document) - 1 or current_length >= target_seq_length:
+            if current_chunk:
+                a_end = 1
+                if len(current_chunk) >= 2:
+                    a_end = rng.randint(1, len(current_chunk) - 1)
+
+                tokens_a = []
+
+                for j in range(a_end):
+                    tokens_a.extend(current_chunk[j])
+
+                tokens_b = []
+                is_random_next = False
+
+                if len(current_chunk) == 1 or rng.random() < 0.5:
+                    is_random_next = True
+                    target_b_length = target_seq_length - len(tokens_a)
+
+                    for _ in range(10):
+                        random_document_index = rng.randint(0, len(all_documents) - 1)
+                        if random_document_index != document_index:
+                            break
+
+                    random_document = all_documents[random_document_index]
+                    random_start = rng.randint(0, len(random_document) - 1)
+
+                    for j in range(random_start, len(random_document)):
+                        tokens_b.extend(random_document[j])
+                        if len(tokens_b) >= target_b_length:
+                            break
+
+                    num_unused_segment = len(current_chunk) - a_end
+                    i -= num_unused_segment
+
+                else:
+                    is_random_next = False
+                    for j in range(a_end, len(current_chunk)):
+                        tokens_b.extend(current_chunk[j])
+                truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng)
+
+                assert len(tokens_a) >= 1
+                assert len(tokens_b) >= 1
+
+                tokens = []
+                segment_ids = []
+                tokens.append("[CLS]")
+                segment_ids.append(0)
+
+                for token in tokens_a:
+                    tokens.append(token)
+                    segment_ids.append(0)
+
+                tokens.append("[SEP]")
+                segment_ids.append(0)
+
+                for token in tokens_b:
+                    tokens.append(token)
+                    segment_ids.append(1)
+                tokens.append("[SEP]")
+                segment_ids.append(1)
+
+                (tokens, masked_lm_positions,
+                 masked_lm_labels) = create_masked_lm_predictions(
+                    tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
+
+                instance = TrainingInstance(
+                    tokens=tokens,
+                    segment_ids=segment_ids,
+                    is_random_next=is_random_next,
+                    masked_lm_positions=masked_lm_positions,
+                    masked_lm_labels=masked_lm_labels)
+                instances.append(instance)
+
+            current_chunk = []
+            current_length = 0
+        i+=1
+
+    return instances
+
+MaskedLmInstance = collections.namedtuple("MaksedLmInstance",
+                                          ["index", "label"])
+
+def create_masked_lm_predictions(tokens, masked_lm_prob,
+                                 max_predictions_per_seq, vocab_words, rng):
+    cand_indexes = []
+
+    for(i, token) in enumerate(tokens):
+        if token == "[CLS]" or token == "[SEP]":
+            continue
+
+        if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and token.startswith("##")):
+            cand_indexes[-1].append(i)
