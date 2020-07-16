@@ -302,3 +302,4 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
 
         if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and token.startswith("##")):
             cand_indexes[-1].append(i)
+            
