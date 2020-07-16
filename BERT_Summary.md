@@ -27,5 +27,69 @@
   )
   ```
 
-  (계속해서 작성될 예정)
+  - Methods
+
+    1. ```python
+       flag_type()
+       ```
+
+       Returns a str that describes the type of the flag.
+
+    2. ```python
+       parse(
+       argument
+       )
+       ```
+
+       Parses string and sets flag value.
+
+    3. ```python
+       serialize()
+       ```
+
+       Serializes the flag.
+
+    4. ```python
+       unparse()
+       ```
+
+    5. ```python
+       __eq__(
+           other
+       )
+       ```
+
+       Return self==value.
+
+    6. ```python
+       __ge__(
+           other, NotImplemented=NotImplemented
+       )
+       ```
+
+       Return a >= b. Computed by @total_ordering from (not a < b).
+
+    7. ```python
+       __gt__(
+           other, NotImplemented=NotImplemented
+       )
+       ```
+
+       Return a > b. Computed by @total_ordering from (not a < b) and (a != b).
+
+    8. ```python
+       __le__(
+           other, NotImplemented=NotImplemented
+       )
+       ```
+
+       Return a <= b. Computed by @total_ordering from (a < b) or (a == b).
+
+    9. ```python
+       __lt__(
+           other
+       )
+       ```
+
+       Return self<value.
 
