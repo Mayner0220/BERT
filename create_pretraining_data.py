@@ -294,26 +294,111 @@ MaskedLmInstance = collections.namedtuple("MaksedLmInstance",
 
 def create_masked_lm_predictions(tokens, masked_lm_prob,
                                  max_predictions_per_seq, vocab_words, rng):
-    cand_indexes = []
+  """Creates the predictions for the masked LM objective."""
 
-    for(i, token) in enumerate(tokens):
-        if token == "[CLS]" or token == "[SEP]":
-            continue
+  cand_indexes = []
+  for (i, token) in enumerate(tokens):
+    if token == "[CLS]" or token == "[SEP]":
+      continue
+    if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and
+        token.startswith("##")):
+      cand_indexes[-1].append(i)
+    else:
+      cand_indexes.append([i])
 
-        if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and token.startswith("##")):
-            cand_indexes[-1].append(i)
+  rng.shuffle(cand_indexes)
+
+  output_tokens = list(tokens)
+
+  num_to_predict = min(max_predictions_per_seq,
+                       max(1, int(round(len(tokens) * masked_lm_prob))))
+
+  masked_lms = []
+  covered_indexes = set()
+  for index_set in cand_indexes:
+    if len(masked_lms) >= num_to_predict:
+      break
+    if len(masked_lms) + len(index_set) > num_to_predict:
+      continue
+    is_any_index_covered = False
+    for index in index_set:
+      if index in covered_indexes:
+        is_any_index_covered = True
+        break
+    if is_any_index_covered:
+      continue
+    for index in index_set:
+      covered_indexes.add(index)
+
+      masked_token = None
+      if rng.random() < 0.8:
+        masked_token = "[MASK]"
+      else:
+        # 10% of the time, keep original
+        if rng.random() < 0.5:
+          masked_token = tokens[index]
+        # 10% of the time, replace with random word
         else:
-            cand_indexes.append([i])
+          masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
 
-    rng.shuffle(cand_indexes)
+      output_tokens[index] = masked_token
 
-    ouput_tokens = list(tokens)
+      masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
+  assert len(masked_lms) <= num_to_predict
+  masked_lms = sorted(masked_lms, key=lambda x: x.index)
 
-    num_to_predict = min(max_predictions_per_seq,
-                         max(1, int(round(len(tokens * masked_lm_prob)))))
-    masked_lms = []
-    covered_indexes = set()
+  masked_lm_positions = []
+  masked_lm_labels = []
+  for p in masked_lms:
+    masked_lm_positions.append(p.index)
+    masked_lm_labels.append(p.label)
 
-    for index_set in cand_indexes:
-        if len(masked_lms) >= num_to_predict:
+  return (output_tokens, masked_lm_positions, masked_lm_labels)
+
+def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
+    while True:
+        total_length = len(tokens_a) + len(tokens_b)
+        if total_length <= max_num_tokens:
             break
+
+        trunc_tokens = tokens_a if len(tokens_a) > len(tokens_b) else tokens_b
+        assert len(trunc_tokens) >= 1
+
+        if rng.random() < 0.5:
+            del trunc_tokens[0]
+        else:
+            trunc_tokens.pop()
+
+def main(_):
+  tf.logging.set_verbosity(tf.logging.INFO)
+
+  tokenizer = tokenization.FullTokenizer(
+      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
+
+  input_files = []
+  for input_pattern in FLAGS.input_file.split(","):
+    input_files.extend(tf.gfile.Glob(input_pattern))
+
+  tf.logging.info("*** Reading from input files ***")
+  for input_file in input_files:
+    tf.logging.info("  %s", input_file)
+
+  rng = random.Random(FLAGS.random_seed)
+  instances = create_training_instances(
+      input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
+      FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
+      rng)
+
+  output_files = FLAGS.output_file.split(",")
+  tf.logging.info("*** Writing to output files ***")
+  for output_file in output_files:
+    tf.logging.info("  %s", output_file)
+
+  write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
+                                  FLAGS.max_predictions_per_seq, output_files)
+
+if __name__ == "__main__":
+    flags.mark_flag_as_required("input_file")
+    flags.mark_flag_as_required("output_file")
+    flags.mark_flag_as_required("vocab_file")
+    tf.app.run()
