@@ -45,15 +45,18 @@ class BertConfig(object):
             config.__dict__[key] = value
         return config
 
+
     @classmethod
     def from_json_file(cls, json_file):
         with tf.gfile.GFile(json_file, "r") as reader:
             text = reader.read()
         return cls.from_dict(json.loads(text))
 
+
     def to_dict(self):
         output = copy.deepcopy(self.__dict__)
         return output
+
 
     def to_json_string(self):
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
@@ -84,6 +87,7 @@ class BertModel(object):
         if token_type_ids is None:
             token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
+        # tf.variable_scope() -> tf.compat.v1.variable_compat() in TF Core v2.2.0
         with tf.compat.v1.variable_scope(scope, default_name="bert"):
             with tf.compat.v1.variable_scope("embedding"):
                 (self.embedding_output, self.embedding_table) = embedding_lookup(
@@ -106,6 +110,7 @@ class BertModel(object):
                     max_position_embeddings=config.max_position_embeddings,
                     dropout_prob=config.hidden_dropout_prob)
 
+                # tf.variable_scope() -> tf.compat.v1.variable_compat() in TF Core v2.2.0
                 with tf.compat.v1.variable_scope("encoder"):
                     attention_mask = create_attention_mask_from_input_mask(
                         input_ids, input_mask)
@@ -136,23 +141,29 @@ class BertModel(object):
     def get_pooled_output(self):
         return self.pooled_output
 
+
     def get_sequence_output(self):
         return self.sequence_output
+
 
     def get_all_encoder_layers(self):
         return self.all_encoder_layers
 
+
     def get_embedding_output(self):
         return self.embedding_output
 
+
     def get_embedding_table(self):
         return self.embedding_table
+
 
 def gelu(x):
     cdf = 0.5 * (1.0 + tf.tanh(
         (np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
 
     return x * cdf
+
 
 def get_activation(activation_string):
     if not isinstance(activation_string, six.string_types):
@@ -172,6 +183,7 @@ def get_activation(activation_string):
         return tf.tanh
     else:
         raise ValueError("Unsupported activation: %s" % act)
+
 
 def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
     assignment_map = {}
@@ -198,6 +210,7 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
 
     return (assignment_map, initialized_variable_names)
 
+
 def dropout(input_tensor, dropout_prob):
   if dropout_prob is None or dropout_prob == 0.0:
     return input_tensor
@@ -205,14 +218,108 @@ def dropout(input_tensor, dropout_prob):
   output = tf.nn.dropout(input_tensor, 1.0 - dropout_prob)
   return output
 
+
 def layer_norm(input_tensor, name=None):
   return tf.contrib.layers.layer_norm(
       inputs=input_tensor, begin_norm_axis=-1, begin_params_axis=-1, scope=name)
+
 
 def layer_norm_and_dropout(input_tensor, dropout_prob, name=None):
   output_tensor = layer_norm(input_tensor, name)
   output_tensor = dropout(output_tensor, dropout_prob)
   return output_tensor
 
+
 def create_initializer(initializer_range=0.02):
   return tf.truncated_normal_initializer(stddev=initializer_range)
+
+
+def embedding_lookup(input_ids,
+                     vocab_size,
+                     embedding_size=128,
+                     initializer_range=0.02,
+                     word_embedding_name="word_embeddings",
+                     use_one_hot_embeddings=False):
+    if input_ids.shape.ndims == 2:
+        input_ids = tf.expand_dims(input_ids, axis=[-1])
+
+    # tf.get_variable() -> tf.compat.v1.get_variable() in TF Core v2.2.0
+    embedding_table = tf.compat.v1.get_variable(
+        name=word_embedding_name,
+        shape=[vocab_size, embedding_size],
+        initializer=create_initializer(initializer_range))
+
+    flat_input_ids = tf.reshape(input_ids, [-1])
+    if use_one_hot_embeddings:
+        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)
+        output = tf.matmul(one_hot_input_ids, embedding_table)
+    else:
+        output = tf.gather(embedding_table, flat_input_ids)
+
+    input_shape = get_shape_list(input_ids)
+
+    output = tf.reshape(output,
+                        input_shape[0:-1] + [input_shape[-1] *  embedding_size])
+    return (output, embedding_table)
+
+
+def embedding_postprocessor(input_tensor,
+                            use_token_type=False,
+                            token_type_ids=None,
+                            token_type_vocab_size=16,
+                            token_type_embedding_name="token_type_embeddings",
+                            use_position_embeddings=True,
+                            position_embedding_name="position_embeddings",
+                            initializer_range=0.02,
+                            max_position_embeddings=512,
+                            dropout_prob=0.1):
+    input_shape = get_shape_list(input_tensor, expected_rank=3)
+    batch_size = input_shape[0]
+    seq_length = input_shape[1]
+    width = input_shape[2]
+
+    output = input_tensor
+
+    if use_token_type:
+        if token_type_ids is None:
+            raise ValueError("`token_type_ids` must be specified if"
+                             "`use_token_type` is True.")
+
+        # tf.get_variable() -> tf.compat.v1.get_variable() in TF Core v2.2.0
+        token_type_table = tf.compat.v1.get_variable(
+            name=token_type_embedding_name,
+            shape=[token_type_vocab_size, width],
+            initializer=create_initializer(initializer_range))
+
+        flat_token_type_ids = tf.reshape(token_type_ids, [-1])
+        one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size)
+        token_type_embeddings = tf.matmul(one_hot_ids, token_type_table)
+        token_type_embeddings = tf.reshape(token_type_embeddings,
+                                           [batch_size, seq_length, width])
+
+        output += token_type_embeddings
+
+    if use_position_embeddings:
+        # tf.assert_less_equal() -> tf.compat.v1.assert_less_equal() in TF Core v2.2.0
+        assert_op = tf.compat.v1.assert_less_equal(seq_length, max_position_embeddings)
+        with tf.control_dependencies([assert_op]):
+            # tf.get_variable() -> tf.compat.v1.get_variable() in TF Core v2.2.0
+            full_position_embeddings = tf.compat.v1.get_variable(
+                name=position_embedding_name,
+                shape=[max_position_embeddings, width],
+                initializer=create_initializer(initializer_range))
+
+            position_embeddings = tf.slice(full_position_embeddings, [0, 0],
+                                           [seq_length, -1])
+            num_dims = len(output.shape.as_list())
+
+            position_broadcast_shape = []
+            for _ in range(num_dims - 2):
+                position_broadcast_shape.append(1)
+            position_broadcast_shape.extend([seq_length, width])
+            position_embeddings = tf.reshape(position_embeddings,
+                                             position_broadcast_shape)
+            output += position_embeddings
+
+    output = layer_norm_and_dropout(output, dropout_prob)
+    return output
