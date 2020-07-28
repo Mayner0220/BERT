@@ -7,8 +7,11 @@ A repository for implementing Google's BERT directly
 This project is about learning and implementing Google's BERT paper.
 The copyright belongs to the original author, and I would like to inform you.
 
+### Development
+- TF Core v2.2.0
+- Checking the APIs where using in this code is essential because TF has updated to Core v2.2.0.
 
-## Reference
+### Reference
 
 https://arxiv.org/abs/1810.04805
 
