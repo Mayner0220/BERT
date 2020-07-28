@@ -1,4 +1,4 @@
-# BERT - Materialization
+# BERT - Implementing 
 A repository for implementing Google's BERT directly
 
 이 프로젝트는 구글의 BERT 논문을 학습하고 직접 구현해본 내용입니다.
