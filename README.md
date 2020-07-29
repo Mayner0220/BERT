@@ -1,4 +1,4 @@
-# BERT - Materialization
+# BERT - Implementing 
 A repository for implementing Google's BERT directly
 
 이 프로젝트는 구글의 BERT 논문을 학습하고 직접 구현해본 내용입니다.
@@ -7,9 +7,12 @@ A repository for implementing Google's BERT directly
 This project is about learning and implementing Google's BERT paper.
 The copyright belongs to the original author, and I would like to inform you.
 
+### Development
+- TF Core v2.2.0
+- Checking the APIs where using in this code is essential because TF has updated to Core v2.2.0.
 
-## Reference
+### Reference
 
-https://arxiv.org/abs/1810.04805
+- https://arxiv.org/abs/1810.04805
 
-https://github.com/google-research/bert
+- https://github.com/google-research/bert
