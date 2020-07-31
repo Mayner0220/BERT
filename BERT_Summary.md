@@ -1,6 +1,6 @@
 # BERT - Bidirectional Encoder Representations form Transformer
 
-참조: [https://mino-park7.github.io/nlp/2018/12/12/bert-%EB%85%BC%EB%AC%B8%EC%A0%95%EB%A6%AC/?fbclid=IwAR3S-8iLWEVG6FGUVxoYdwQyA-zG0GpOUzVEsFBd0ARFg4eFXqCyGLznu7w#35-fine-tuning-procedure](https://mino-park7.github.io/nlp/2018/12/12/bert-논문정리/?fbclid=IwAR3S-8iLWEVG6FGUVxoYdwQyA-zG0GpOUzVEsFBd0ARFg4eFXqCyGLznu7w#35-fine-tuning-procedure)
+Source: [https://mino-park7.github.io/nlp/2018/12/12/bert-%EB%85%BC%EB%AC%B8%EC%A0%95%EB%A6%AC/?fbclid=IwAR3S-8iLWEVG6FGUVxoYdwQyA-zG0GpOUzVEsFBd0ARFg4eFXqCyGLznu7w#35-fine-tuning-procedure](https://mino-park7.github.io/nlp/2018/12/12/bert-논문정리/?fbclid=IwAR3S-8iLWEVG6FGUVxoYdwQyA-zG0GpOUzVEsFBd0ARFg4eFXqCyGLznu7w#35-fine-tuning-procedure)
 
 ---
 
@@ -58,4 +58,27 @@
 
 ---
 
-## Related Work
+## BERT
+
+- BERT의 아키텍처는 Attention is all you need에서 소개된 Transformer를 사용하지만, pre-training과 fiine-tuning시의 아키텍처를 조금 다르게하여 Transfer Learning을 용이하게 만드는 것이 핵심이다.
+
+### Model Architecture
+
+- BERT는 transformer 중에서도 encoder 부분만을 사용한다.
+- BERT는 모델의 크기에 따라 base 모델과 large 모델을 제공한다.
+  - BERT_base : L=12, H=768, A=12, Total Parameters = 110M
+  - BERT_large : L=24, H=1024, A=16, Total Parameters = 340M
+  - L : transformer block의 layer 수, H : hidden size, A : self-attention heads 수, feed-forward/filter size = 4H
+- 여기서 BERT_base 모델의 경우, OpenAI GPT모델과 hyper parameter가 동일하다. 여기서 BERT의 저자가 의도한 바는 모델의 하이퍼 파라미터가 동일하더라도, pre-training concept를 바꾸어 주는 것만으로 훨씬 높은 성능을 낼 수 있다는 것을 보여주고자 하는 것 같다.
+
+### Input Representation
+
+![그림2. bert input representation (출처: BERT 논문)](https://mino-park7.github.io/images/2019/02/bert-input-representation.png)
+
+- BERT의 input은 3가지 embedding 값의 합으로 이루어져 있다.
+- WordPiece embedding을 사용한다. BERT english의 경우 30000개의 token을 사용했다.
+- Position embedding을 사용한다. 이는 Transformer에서 사용한 방식과 같음을 알 수 있다.
+- 모든 sentence의 첫번째 token은 언제나 `[CLS]`(special classification token) 이다. 이 `[CLS]` token은 transformer 전체층을 다 거치고 나면 token sequence의 결합된 의미를 가지게 되는데, 여기에 간단한 classifier를 붙이면 단일 문장, 또는 연속된 문장의 classification을 쉽게 할 수 있게 된다. 만약 classification task가 아니라면 이 token은 무시하면 된다.
+- Sentence pair는 합쳐져서 single sequence로 입력되게 된다. 각각의 Sentence는 실제로는 수 개의 sentence로 이루어져 있을 수 있다(eg. QA task의 경우 `[Question, Paragraph]`에서 Paragraph가 여러개의 문장). 그래서 두 개의 문장을 구분하기 위해, 첫째로는 `[SEP]` token 사용, 둘째로는 Segment embedding을 사용하여 앞의 문장에는 `sentence A embedding`, 뒤의 문장에는 `sentence B embedding`을 더해준다. (모두 고정된 값)
+- 만약 문장이 하나만 들어간다면 `sentence A embedding`만을 사용한다.
+
