@@ -82,3 +82,31 @@ Source: [https://mino-park7.github.io/nlp/2018/12/12/bert-%EB%85%BC%EB%AC%B8%EC%
 - Sentence pair는 합쳐져서 single sequence로 입력되게 된다. 각각의 Sentence는 실제로는 수 개의 sentence로 이루어져 있을 수 있다(eg. QA task의 경우 `[Question, Paragraph]`에서 Paragraph가 여러개의 문장). 그래서 두 개의 문장을 구분하기 위해, 첫째로는 `[SEP]` token 사용, 둘째로는 Segment embedding을 사용하여 앞의 문장에는 `sentence A embedding`, 뒤의 문장에는 `sentence B embedding`을 더해준다. (모두 고정된 값)
 - 만약 문장이 하나만 들어간다면 `sentence A embedding`만을 사용한다.
 
+### Pre-training Tasks
+
+- 기존의 ELMo나 GPT는 left to right Language  Model을 사용하여 pre-training을 하지만, BERT는 이와 다르게 2가지의 새로운 unsupervised prediction task로 pre-training을 수행한다.
+
+  - Task1: Masked LM
+
+    ![그림3. MLM](https://cdn-images-1.medium.com/max/2000/0*ViwaI3Vvbnd-CJSQ.png)
+
+    - 단어 중의 일부를 `[MASK]` token 으로 바꾸어 준다. 바꾸어 주는 비율은 15%이다.
+    - plain text를 tokenization하는 방법은 input representation에서 설명한 바와 같이 WordPiece를 사용한다.
+    - 이를 통하여 LM의 left-to-right(혹은 r2l)을 통하여 문장 전체를 predict하는 방법론과는 달리, `[MASK]` token 만을 predict하는 pre-training task를 수행한다.
+    - 이 `[MASK]` token은 pre-training에만 사용되고, fine-tuning시에는 사용되지 않는다. 해당 token을 맞추어 내는 task를 수행하면서, BERT는 문맥을 파악하는 능력을 길러내게 된다.
+    - 15%의 `[MASK]` token을 만들어 낼 때, 몇가지 추가적인 처리를 더 해주게 된다.
+      - 80%: token을 `[MASK]`로 바꿉니다. eg., `my dog is hairy -> my dog is [MASK]`
+      - 10%의 경우 : token을 random word로 바꾸어 준다. eg., `my dog is hariy -> my dog is apple`
+      - 0%의 경우 : token을 원래의 단어로 그대로 놔둔다. 이는 실제 관측된 단어에 대한 표상을 bias해주기 위해 실시한다.
+    - pre-trained되는 Transformer encoder의 입장에서는 어떤 단어를 predict하라고 하는건지, 혹은 random word로 바뀌었는지 알 수 없다. Transformer encoder는 그냥 모든 token에 대해서 distributional contextual representation을 유지하도록 강제한다.
+    - random wordㄹ 바꾸는 것 때문에 모델의 language understanding 능력에 해를 끼친다고 생각할 수 있지만, 바뀌는 부분이 1.5%에 불과하므로, 해를 끼치지 않는다.
+    - MLM은 보통의 LM보다 converge하는데에 많은 training step이 필요하지만, emperical하게는 LM보다 훨씬 빠르게 좋은 성능을 낸다.
+
+- Task2: Next Sentence prediction
+
+  - pre-training task 수행하는 이유는, 여러 중요한 NLP task중에 QA나 Natural Language Inference(NLI)와 같이 두 문장 사이의 관계를 이해하는 것이 중요한 것들이기 때문이다. 이들은 language modeling에서 capture되지 않는다.
+  - BERT에서는 corpus에서 두 문장을 이어 붙여 이것이 원래의 corpus에서 바로 이어 붙여져 있던 문장인지를 맞추는 binarized next sentence prediction task를 수행한다.
+    - 50% : sentence A, B가 실제 next sentence
+    - 50% : sentence A, B가 corpus에서 random으로 뽑힌(관계가 없는) 두 문장
+  - pre-training이 완료되면, 이 task는 97~98%의 accuracy를 달성했다. 이러한 간단한 task를 부여해도, QA나 NLI에 굉장히 의미있는 성능 향상을 이루어 냈다.
+
