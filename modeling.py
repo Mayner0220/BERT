@@ -11,7 +11,6 @@ import numpy as np
 import six
 import tensorflow as tf
 
-
 class BertConfig(object):
     def __init__(self,
                  vocab_size,

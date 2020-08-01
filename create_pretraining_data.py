@@ -7,7 +7,8 @@ import random
 import tokenization
 import tensorflow as tf
 
-flags = tf.flags
+# tf.flags() -> tf.compat.v1.flags in TF Core v2.2.0
+flags = tf.compat.v1.flags
 
 FLAGS = flags.FLAGS
 
@@ -48,6 +49,7 @@ flags.DEFINE_float(
     "Probability of creating sequences which are shorter than the "
     "maximum length.")
 
+
 class TrainingInstance(object):
     def __init__(self, tokens, segment_ids, masked_lm_positions, masked_lm_labels,
                  is_random_next):
@@ -61,7 +63,8 @@ class TrainingInstance(object):
         s = ""
         s += "tokens: %s\n" % (" ".join(
             [tokenization.printable_text(x) for x in self.tokens]))
-        s += "segment_ids: %s\n" % (" ".join([str(x) for x in self.segment_ids]))
+        s += "segment_ids: %s\n" % (" ".join([str(x)
+                                              for x in self.segment_ids]))
         s += "is_random_next: %s\n" % self.is_random_next
         s += "masked_lm_positions: %s\n" % (" ".join(
             [str(x) for x in self.masked_lm_positions]))
@@ -73,11 +76,12 @@ class TrainingInstance(object):
     def __repr__(self):
         return self.__str__()
 
+
 def write_instance_to_example_files(instances, tokenizer, max_seq_length,
                                     max_predictions_per_seq, output_files):
     writers = []
     for output_file in output_files:
-        writers.append(tf.python_io.TFRecordWriter(output_file))
+        writers.append(tf.compat.v1.python_io.TFRecordWriter(output_file))
 
     writer_index = 0
     total_written = 0
@@ -115,7 +119,8 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     features["masked_lm_positions"] = create_int_feature(masked_lm_positions)
     features["masked_lm_ids"] = create_int_feature(masked_lm_ids)
     features["masked_lm_weights"] = create_float_feature(masked_lm_weights)
-    features["next_sentence_labels"] = create_int_feature([next_sentence_label])
+    features["next_sentence_labels"] = create_int_feature(
+        [next_sentence_label])
 
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
 
@@ -125,9 +130,9 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     total_written += 1
 
     if inst_index < 20:
-        tf.logging.info("*** Example ***")
-        tf.logging.info("tokens: %s" % " ".join(
-              [tokenization.printable_text(x) for x in instance.tokens]))
+        tf.compat.v1.logging.info("*** Example ***")
+        tf.compat.v1.logging.info("tokens: %s" % " ".join(
+            [tokenization.printable_text(x) for x in instance.tokens]))
 
         for feature_name in features.keys():
             feature = features[feature_name]
@@ -136,21 +141,27 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
                 values = feature.int64_list.value
             elif feature.float_list.value:
                 values = feature.float_list.value
-        tf.logging.info(
+        tf.compat.v1.logging.info(
             "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
 
         for writer in writers:
             writer.close()
 
-        tf.logging.info("Wrote %d total instance", total_written)
+        tf.compat.v1.compat.v1.logging.info(
+            "Wrote %d total instance", total_written)
+
 
 def create_int_feature(values):
-    feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
+    feature = tf.train.Feature(
+        int64_list=tf.train.Int64List(value=list(values)))
     return feature
 
+
 def create_float_feature(values):
-    feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
+    feature = tf.train.Feature(
+        float_list=tf.train.FloatList(value=list(values)))
     return feature
+
 
 def create_training_instances(input_files, tokenizer, max_seq_length,
                               dupe_factor, short_seq_prob, masked_lm_prob,
@@ -158,7 +169,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
     all_documents = []
 
     for input_file in input_files:
-        with tf.gfile.GFile(input_file, "r") as reader:
+        with tf.compat.v1.gfile.GFile(input_file, "r") as reader:
             while True:
                 line = tokenization.convert_to_unicode(reader.readline())
 
@@ -190,8 +201,9 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
     rng.shuffle(instances)
     return instances
 
+
 def create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
-    masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
+                                   masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
     document = all_documents[document_index]
     max_num_tokens = max_seq_length - 3
     target_seq_length = max_num_tokens
@@ -229,7 +241,8 @@ def create_instances_from_document(all_documents, document_index, max_seq_length
                     target_b_length = target_seq_length - len(tokens_a)
 
                     for _ in range(10):
-                        random_document_index = rng.randint(0, len(all_documents) - 1)
+                        random_document_index = rng.randint(
+                            0, len(all_documents) - 1)
                         if random_document_index != document_index:
                             break
 
@@ -285,75 +298,80 @@ def create_instances_from_document(all_documents, document_index, max_seq_length
 
             current_chunk = []
             current_length = 0
-        i+=1
+        i += 1
 
     return instances
+
 
 MaskedLmInstance = collections.namedtuple("MaksedLmInstance",
                                           ["index", "label"])
 
+
 def create_masked_lm_predictions(tokens, masked_lm_prob,
                                  max_predictions_per_seq, vocab_words, rng):
-  """Creates the predictions for the masked LM objective."""
+    """Creates the predictions for the masked LM objective."""
 
-  cand_indexes = []
-  for (i, token) in enumerate(tokens):
-    if token == "[CLS]" or token == "[SEP]":
-      continue
-    if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and
-        token.startswith("##")):
-      cand_indexes[-1].append(i)
-    else:
-      cand_indexes.append([i])
-
-  rng.shuffle(cand_indexes)
-
-  output_tokens = list(tokens)
-
-  num_to_predict = min(max_predictions_per_seq,
-                       max(1, int(round(len(tokens) * masked_lm_prob))))
-
-  masked_lms = []
-  covered_indexes = set()
-  for index_set in cand_indexes:
-    if len(masked_lms) >= num_to_predict:
-      break
-    if len(masked_lms) + len(index_set) > num_to_predict:
-      continue
-    is_any_index_covered = False
-    for index in index_set:
-      if index in covered_indexes:
-        is_any_index_covered = True
-        break
-    if is_any_index_covered:
-      continue
-    for index in index_set:
-      covered_indexes.add(index)
-
-      masked_token = None
-      if rng.random() < 0.8:
-        masked_token = "[MASK]"
-      else:
-        # 10% of the time, keep original
-        if rng.random() < 0.5:
-          masked_token = tokens[index]
-        # 10% of the time, replace with random word
+    cand_indexes = []
+    for (i, token) in enumerate(tokens):
+        if token == "[CLS]" or token == "[SEP]":
+            continue
+        if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and
+                token.startswith("##")):
+            cand_indexes[-1].append(i)
         else:
-          masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
+            cand_indexes.append([i])
 
-      output_tokens[index] = masked_token
+    rng.shuffle(cand_indexes)
 
-      masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
-  assert len(masked_lms) <= num_to_predict
-  masked_lms = sorted(masked_lms, key=lambda x: x.index)
+    output_tokens = list(tokens)
 
-  masked_lm_positions = []
-  masked_lm_labels = []
-  for p in masked_lms:
-    masked_lm_positions.append(p.index)
-    masked_lm_labels.append(p.label)
+    num_to_predict = min(max_predictions_per_seq,
+                         max(1, int(round(len(tokens) * masked_lm_prob))))
 
-  return (output_tokens, masked_lm_positions, masked_lm_labels)
+    masked_lms = []
+    covered_indexes = set()
+    for index_set in cand_indexes:
+        if len(masked_lms) >= num_to_predict:
+            break
+        if len(masked_lms) + len(index_set) > num_to_predict:
+            continue
+        is_any_index_covered = False
+        for index in index_set:
+            if index in covered_indexes:
+                is_any_index_covered = True
+                break
+        if is_any_index_covered:
+            continue
+        for index in index_set:
+            covered_indexes.add(index)
+
+            masked_token = None
+            if rng.random() < 0.8:
+                masked_token = "[MASK]"
+            else:
+                # 10% of the time, keep original
+                if rng.random() < 0.5:
+                    masked_token = tokens[index]
+                # 10% of the time, replace with random word
+                else:
+                    masked_token = vocab_words[rng.randint(
+                        0, len(vocab_words) - 1)]
+
+            output_tokens[index] = masked_token
+
+            masked_lms.append(MaskedLmInstance(
+                index=index, label=tokens[index]))
+    assert len(masked_lms) <= num_to_predict
+    masked_lms = sorted(masked_lms, key=lambda x: x.index)
+
+    masked_lm_positions = []
+    masked_lm_labels = []
+    for p in masked_lms:
+        masked_lm_positions.append(p.index)
+        masked_lm_labels.append(p.label)
+
+    return (output_tokens, masked_lm_positions, masked_lm_labels)
+
 
 def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
     while True:
@@ -369,36 +387,40 @@ def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
         else:
             trunc_tokens.pop()
 
+
 def main(_):
-  tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
-  tokenizer = tokenization.FullTokenizer(
-      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
+    tokenizer = tokenization.FullTokenizer(
+        vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
-  input_files = []
-  for input_pattern in FLAGS.input_file.split(","):
-    input_files.extend(tf.gfile.Glob(input_pattern))
+    input_files = []
+    for input_pattern in FLAGS.input_file.split(","):
+        input_files.extend(tf.compat.v1.gfile.Glob(input_pattern))
 
-  tf.logging.info("*** Reading from input files ***")
-  for input_file in input_files:
-    tf.logging.info("  %s", input_file)
+    tf.compat.v1.logging.info("*** Reading from input files ***")
+    for input_file in input_files:
+        tf.compat.v1.logging.info("  %s", input_file)
 
-  rng = random.Random(FLAGS.random_seed)
-  instances = create_training_instances(
-      input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
-      FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
-      rng)
+    rng = random.Random(FLAGS.random_seed)
+    instances = create_training_instances(
+        input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
+        FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
+        rng)
 
-  output_files = FLAGS.output_file.split(",")
-  tf.logging.info("*** Writing to output files ***")
-  for output_file in output_files:
-    tf.logging.info("  %s", output_file)
+    output_files = FLAGS.output_file.split(",")
+    tf.compat.v1.logging.info("*** Writing to output files ***")
+    for output_file in output_files:
+        tf.compat.v1.logging.info("  %s", output_file)
 
-  write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
-                                  FLAGS.max_predictions_per_seq, output_files)
+    write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
+                                    FLAGS.max_predictions_per_seq, output_files)
+
 
 if __name__ == "__main__":
     flags.mark_flag_as_required("input_file")
     flags.mark_flag_as_required("output_file")
     flags.mark_flag_as_required("vocab_file")
-    tf.app.run()
+
+    # tf.app.run() -> tf.compat.v1.app.run() in TF Core v2.2.0
+    tf.compat.v1.app.run()
