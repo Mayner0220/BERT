@@ -220,7 +220,7 @@ def create_instances_from_document(all_documents, document_index, max_seq_length
     while i < len(document):
         segment = document[i]
         current_chunk.append(segment)
-        current_length.append(segment)
+        current_length += len(segment)
 
         if i == len(document) - 1 or current_length >= target_seq_length:
             if current_chunk:
