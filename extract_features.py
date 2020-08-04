@@ -6,4 +6,3 @@ import codecs
 import collections
 import json
 import re
-
