@@ -110,3 +110,8 @@ Source: [https://mino-park7.github.io/nlp/2018/12/12/bert-%EB%85%BC%EB%AC%B8%EC%
     - 50% : sentence A, B가 corpus에서 random으로 뽑힌(관계가 없는) 두 문장
   - pre-training이 완료되면, 이 task는 97~98%의 accuracy를 달성했다. 이러한 간단한 task를 부여해도, QA나 NLI에 굉장히 의미있는 성능 향상을 이루어 냈다.
 
+### Pre-training Procedure
+
+- pre-training의 기본적인 절차는 LM에서 수행하는 것과 같다.
+- BERT_english의 경우 BookCorpus와 English Wikipedia를 사용했다. Wikipedia 데이터에서 text passage만 추출하여 사용했다고 한다. 이유는 long contiguous sequence만을 학습시키고 싶어서 이다.
+
