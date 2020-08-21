@@ -8,6 +8,7 @@ import collections
 import unicodedata
 import tensorflow as tf
 
+
 def validate_case_matches_checkpoint(do_lower_case, init_checkpoint):
     if not init_checkpoint:
         return
@@ -133,11 +134,12 @@ class FullTokenizer(object):
 
     def tokenize(self, text):
         split_tokens = []
-        for token in self.basic_tokenizer.tokenzie(text):
+        for token in self.basic_tokenizer.tokenize(text):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
 
         return split_tokens
+
 
     def convert_tokens_to_ids(self, tokens):
         return convert_by_vocab(self.vocab, tokens)
@@ -151,7 +153,7 @@ class BasicTokenizer(object):
         self.do_lower_case = do_lower_case
 
 
-    def tokenize(self, text):
+    def tokenizer(self, text):
         text = convert_to_unicode(text)
         text = self._clean_text(text)
         text = self._tokenize_chinese_chars(text)
