@@ -114,4 +114,15 @@ Source: [https://mino-park7.github.io/nlp/2018/12/12/bert-%EB%85%BC%EB%AC%B8%EC%
 
 - pre-training의 기본적인 절차는 LM에서 수행하는 것과 같다.
 - BERT_english의 경우 BookCorpus와 English Wikipedia를 사용했다. Wikipedia 데이터에서 text passage만 추출하여 사용했다고 한다. 이유는 long contiguous sequence만을 학습시키고 싶어서 이다.
+- input pre-processing
+  - NSP를 위해 sentence를 뽑아서 embedding A, B를 넣어줍니다.
+    50%는 진짜 next sentence, 나머지는 random sentence를 사용한다.
+  - 이 모든 토큰이 합쳐진 길이는 512개 이하여야 한다. (OOM 때문)
+  - 이후 Masking 작업을 한다.
+- pre-training 시의 Hyper Parameters
+  - batch size : 256 sequences (256 sequences * 512 tokens = 128,000 tokens/batch) for 1,000,000 steps -> 3.3 billion word corpus의 40 epochs
+  - Adam optimizer, learning rate : 1e-4, β1=0.9β1=0.9, β2=0.999β2=0.999, L2 weight decay of 0.01, learning rate warmup over the first 10,000 steps, linear decay of the learning rate
+  - Dropout prob: 0.1 for all layers
+  - using gelu activation
+  - BERT_base - 4 TPUs, BERT_large - 16 TPUs를 사용하여 4일동안 학습
 
